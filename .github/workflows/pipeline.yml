@@ -1,0 +1,80 @@
+# StudySpace pipeline for the MIT709 Week 7 lab. Save as .github/workflows/pipeline.yml.
+# This is the Week 6 pipeline (rules CI-01 to CI-13) with the new usage_report module
+# added to CI-03 (tests and coverage), CI-05 (release artefact) and CI-08 (Bandit).
+
+name: studyspace-pipeline
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, security and dependency checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: CI-07 lint (Ruff)
+        run: ruff check .
+      - name: CI-08 code security (Bandit)
+        run: bandit booking_rules.py booking_store.py usage_report.py
+      - name: CI-09 dependency audit (pip-audit)
+        run: pip-audit -r requirements.txt
+      - name: CI-10 workflow audit (zizmor)
+        run: zizmor --offline .github/workflows/
+
+  test:
+    name: Tests, coverage and mutation gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: CI-03 tests with coverage gate
+        run: pytest test_booking_rules.py test_booking_store.py test_usage_report.py --cov=booking_rules --cov=booking_store --cov=usage_report --cov-branch --cov-report=term-missing --cov-fail-under=90
+      - name: CI-04 mutation score gate
+        run: python mutants.py test_booking_rules.py --min-score 90
+
+  deliver:
+    name: Deliver release artefact
+    needs: [checks, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: CI-05 upload release artefact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: studyspace-release
+          path: |
+            booking_rules.py
+            booking_store.py
+            usage_report.py
