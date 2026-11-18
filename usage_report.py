@@ -29,7 +29,7 @@ def build_daily_report(bookings, rooms, building, day):
             if b["room"] not in tmp:
                 continue
             # only bookings for this day
-            if b["start"].day == day.day:
+            if b["start"].date() == day:
                 d = (b["end"] - b["start"]).total_seconds() / 60
                 if d > 0:
                     tmp[b["room"]]["bookings"] = tmp[b["room"]]["bookings"] + 1

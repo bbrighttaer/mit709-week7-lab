@@ -96,3 +96,8 @@ def test_us09_format_report_shows_rooms_and_totals():
     assert lines[0] == "Usage report: Library on 2026-11-10"
     assert lines[2].split() == ["L1.01", "1", "60", "1", "0"]
     assert lines[4].split() == ["TOTAL", "2", "120", "1", "1"]
+
+def test_rv01_report_ignores_the_same_day_number_in_another_month():
+    bookings = [booking(1, "L1.01", 9), booking(2, "L1.01", 9, day=date(2026, 10, 10))]
+    report = usage_report.build_daily_report(bookings, ROOMS, "Library", DAY)
+    assert report["totals"]["bookings"] == 1
